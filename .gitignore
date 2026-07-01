@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Local dev / scratch
+scratch.log
+*.log
+
+# Generated 3D outputs
+outputs/
+/outputs/
+*.glb
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

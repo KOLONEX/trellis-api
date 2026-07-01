@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TRELLIS · Image → 3D</title>
+<style>
+  :root { --bg:#0e0f13; --panel:#1a1c22; --accent:#5b8cff; --text:#e6e8ee; --muted:#8a8f9c; --border:#2a2d36; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; }
+  header { padding:12px 18px; font-weight:600; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  #lang { display:flex; gap:4px; }
+  #lang button { background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:4px 9px; font-size:12px; font-weight:600; cursor:pointer; }
+  #lang button.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  main { flex:1; display:flex; min-height:0; }
+  #sidebar { width:300px; padding:16px; border-right:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+  #drop { border:2px dashed #3a3e49; border-radius:10px; padding:18px; text-align:center; color:var(--muted); cursor:pointer; }
+  #drop.drag { border-color:var(--accent); color:var(--text); }
+  #preview { max-width:100%; border-radius:8px; display:none; }
+  label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  .lblrow { display:flex; align-items:center; gap:6px; }
+  .help { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px;
+          border-radius:50%; border:1px solid var(--muted); color:var(--muted); font-size:10px;
+          font-weight:700; cursor:help; position:relative; flex:none; user-select:none; }
+  .help:hover { border-color:var(--accent); color:var(--accent); }
+  .help .tip { display:none; position:absolute; top:140%; left:0; width:225px; background:#23262f;
+               border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-size:11px;
+               font-weight:400; color:var(--text); line-height:1.45; z-index:20; text-align:left;
+               white-space:normal; box-shadow:0 8px 24px rgba(0,0,0,.55); }
+  .help:hover .tip, .help:focus .tip { display:block; }
+  .help .tip b { color:var(--accent); font-weight:600; }
+  input, select { background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:11px; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  #viewer { flex:1; position:relative; min-width:0; }
+  #canvas { width:100%; height:100%; display:block; }
+  #overlay { position:absolute; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:rgba(10,11,15,.6); }
+  .spinner { width:42px; height:42px; border:4px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #toolbar { position:absolute; top:12px; right:12px; display:flex; gap:8px; }
+  #toolbar button { background:var(--panel); border:1px solid var(--border); padding:8px 10px; font-weight:500; }
+  #download-btn { display:none; }
+  .hint { font-size:12px; color:var(--muted); }
+  a { text-decoration:none; }
+</style>
+</head>
+<body>
+<header>
+  <span>TRELLIS · Image → 3D</span>
+  <span id="lang"><button data-lang="es">ES</button><button data-lang="en">EN</button></span>
+</header>
+<main>
+  <aside id="sidebar">
+    <div id="drop" data-i18n-html="drop">Arrastrá una imagen acá<br>o hacé click para elegir</div>
+    <input id="file" type="file" accept="image/*" hidden>
+    <img id="preview" alt="preview">
+    <label>
+      <span class="lblrow"><span data-i18n="seedLabel">Seed (0 = aleatorio)</span>
+        <span class="help" tabindex="0">?<span class="tip" data-i18n-html="seedTip"><b>Semilla del generador.</b> La misma imagen + la misma seed produce siempre el mismo modelo (reproducible). Cambiala para obtener variantes distintas del mismo objeto. <b>0</b> = aleatoria (la seed usada se devuelve en la respuesta).</span></span>
+      </span>
+      <input id="seed" type="number" value="0" min="0">
+    </label>
+    <label>
+      <span class="lblrow"><span data-i18n="simplifyLabel">Simplificar</span>
+        <span class="help" tabindex="0">?<span class="tip" data-i18n-html="simplifyTip"><b>Simplificación de la malla (0–1).</b> Fracción de triángulos que se eliminan al decimar la mesh. <b>0.95</b> deja ~5% (liviano, ideal web/AR). Más bajo = más polígonos y detalle, archivo más pesado. Más alto = más liviano pero más facetado.</span></span>
+      </span>
+      <input id="simplify" type="number" value="0.95" min="0" max="1" step="0.01">
+    </label>
+    <label>
+      <span class="lblrow"><span data-i18n="textureLabel">Tamaño de textura</span>
+        <span class="help" tabindex="0">?<span class="tip" data-i18n-html="textureTip"><b>Resolución del mapa de textura (px).</b> Tamaño de la textura horneada sobre la mesh. Más alto = texturas más nítidas, pero archivo más pesado y más tiempo/VRAM. <b>1024</b> es buen equilibrio; 2048 para máximo detalle; 512 para algo bien liviano.</span></span>
+      </span>
+      <select id="texture">
+        <option value="512">512</option>
+        <option value="1024" selected>1024</option>
+        <option value="2048">2048</option>
+      </select>
+    </label>
+    <button id="generate" data-i18n="generate" disabled>Generar</button>
+    <div class="hint" data-i18n="hint">Arrastrar = rotar · Rueda = zoom · Click derecho = mover</div>
+  </aside>
+  <section id="viewer">
+    <canvas id="canvas"></canvas>
+    <div id="toolbar">
+      <button id="reset" data-i18n="reset">Reset cámara</button>
+      <a id="download" download="model.glb"><button id="download-btn" data-i18n="download">Descargar .glb</button></a>
+    </div>
+    <div id="overlay"><div class="spinner"></div><div data-i18n="generating">Generando modelo 3D…</div></div>
+  </section>
+</main>
+
+<script type="importmap">
+{ "imports": {
+  "three": "/vendor/three/three.module.js",
+  "three/addons/": "/vendor/three/addons/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e0f13);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+camera.position.set(0, 0, 3);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+let current = null;
+const loader = new GLTFLoader();
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (w === 0 || h === 0) return;
+  if (canvas.width !== w || canvas.height !== h) {
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+}
+function animate() {
+  requestAnimationFrame(animate);
+  resize();
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+function disposeCurrent() {
+  if (!current) return;
+  scene.remove(current);
+  current.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); }
+        m.dispose();
+      }
+    }
+  });
+  current = null;
+}
+
+function fitCamera(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  obj.position.sub(center);
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const dist = maxDim / (2 * Math.tan((Math.PI * camera.fov) / 360));
+  camera.position.set(0, 0, dist * 1.6);
+  camera.near = dist / 100;
+  camera.far = dist * 100;
+  camera.updateProjectionMatrix();
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+function loadGlb(url) {
+  loader.load(url, gltf => {
+    disposeCurrent();
+    current = gltf.scene;
+    scene.add(current);
+    fitCamera(current);
+    const a = document.getElementById('download');
+    a.href = url;
+    document.getElementById('download-btn').style.display = 'inline-block';
+  }, undefined, err => alert(t('errLoad') + '\n' + err));
+}
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const preview = document.getElementById('preview');
+const genBtn = document.getElementById('generate');
+const overlay = document.getElementById('overlay');
+let selectedFile = null;
+
+function setFile(f) {
+  if (!f || !f.type.startsWith('image/')) return;
+  selectedFile = f;
+  preview.src = URL.createObjectURL(f);
+  preview.style.display = 'block';
+  genBtn.disabled = false;
+}
+
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => setFile(e.target.files[0]));
+['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+drop.addEventListener('drop', e => setFile(e.dataTransfer.files[0]));
+
+document.getElementById('reset').addEventListener('click', () => { if (current) fitCamera(current); });
+
+genBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  fd.append('seed', document.getElementById('seed').value);
+  fd.append('simplify', document.getElementById('simplify').value);
+  fd.append('texture_size', document.getElementById('texture').value);
+  overlay.style.display = 'flex';
+  genBtn.disabled = true;
+  try {
+    const res = await fetch('/generate', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text()));
+    const data = await res.json();
+    loadGlb(data.url);
+  } catch (err) {
+    alert(t('errGen') + '\n' + err.message);
+  } finally {
+    overlay.style.display = 'none';
+    genBtn.disabled = false;
+  }
+});
+
+// ---- i18n (ES / EN) ----
+const I18N = {
+  es: {
+    drop: 'Arrastrá una imagen acá<br>o hacé click para elegir',
+    seedLabel: 'Seed (0 = aleatorio)',
+    simplifyLabel: 'Simplificar',
+    textureLabel: 'Tamaño de textura',
+    generate: 'Generar',
+    generating: 'Generando modelo 3D…',
+    hint: 'Arrastrar = rotar · Rueda = zoom · Click derecho = mover',
+    reset: 'Reset cámara',
+    download: 'Descargar .glb',
+    seedTip: '<b>Semilla del generador.</b> La misma imagen + la misma seed produce siempre el mismo modelo (reproducible). Cambiala para obtener variantes distintas del mismo objeto. <b>0</b> = aleatoria (la seed usada se devuelve en la respuesta).',
+    simplifyTip: '<b>Simplificación de la malla (0–1).</b> Fracción de triángulos que se eliminan al decimar la mesh. <b>0.95</b> deja ~5% (liviano, ideal web/AR). Más bajo = más polígonos y detalle, archivo más pesado. Más alto = más liviano pero más facetado.',
+    textureTip: '<b>Resolución del mapa de textura (px).</b> Tamaño de la textura horneada sobre la mesh. Más alto = texturas más nítidas, pero archivo más pesado y más tiempo/VRAM. <b>1024</b> es buen equilibrio; 2048 para máximo detalle; 512 para algo bien liviano.',
+    errGen: 'Error generando el modelo:',
+    errLoad: 'No se pudo cargar el modelo:',
+  },
+  en: {
+    drop: 'Drag an image here<br>or click to choose',
+    seedLabel: 'Seed (0 = random)',
+    simplifyLabel: 'Simplify',
+    textureLabel: 'Texture size',
+    generate: 'Generate',
+    generating: 'Generating 3D model…',
+    hint: 'Drag = rotate · Wheel = zoom · Right-click = pan',
+    reset: 'Reset camera',
+    download: 'Download .glb',
+    seedTip: '<b>Generation seed.</b> The same image + the same seed always produces the same model (reproducible). Change it to get different variations of the same object. <b>0</b> = random (the seed used is returned in the response).',
+    simplifyTip: '<b>Mesh simplification (0–1).</b> Fraction of triangles removed when decimating the mesh. <b>0.95</b> keeps ~5% (lightweight, ideal for web/AR). Lower = more polygons and detail, heavier file. Higher = lighter but more faceted.',
+    textureTip: '<b>Texture map resolution (px).</b> Size of the texture baked onto the mesh. Higher = sharper textures but heavier file and more time/VRAM. <b>1024</b> is a good balance; 2048 for max detail; 512 for very lightweight.',
+    errGen: 'Error generating the model:',
+    errLoad: 'Could not load the model:',
+  },
+};
+let lang = 'es';
+function t(k) { return (I18N[lang] && I18N[lang][k]) || I18N.es[k] || k; }
+function applyLang(l) {
+  lang = I18N[l] ? l : 'es';
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  document.querySelectorAll('#lang button').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+  try { localStorage.setItem('trellis_lang', lang); } catch (e) {}
+}
+document.querySelectorAll('#lang button').forEach(b => b.addEventListener('click', () => applyLang(b.dataset.lang)));
+let saved = null;
+try { saved = localStorage.getItem('trellis_lang'); } catch (e) {}
+applyLang(saved || ((navigator.language || 'es').slice(0, 2) === 'en' ? 'en' : 'es'));
+</script>
+</body>
+</html>

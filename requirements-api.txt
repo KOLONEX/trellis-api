@@ -1,0 +1,12 @@
+# API-specific deps installed ON TOP of what TRELLIS's setup.sh provides.
+# Do NOT pin libraries that TRELLIS/transformers manage (pillow, huggingface_hub):
+# pinning them here downgrades the coherent versions setup.sh installed and breaks
+# transformers (e.g. it requires huggingface-hub>=1.5, our old pin broke imports).
+# Left unpinned, pip keeps the already-installed compatible versions in the image
+# and pulls the latest on a plain host for dev.
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+pydantic==2.9.2
+pillow
+huggingface_hub

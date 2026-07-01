@@ -1,0 +1,22 @@
+services:
+  trellis-api:
+    build: .
+    image: trellis-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - trellis-outputs:/outputs
+    environment:
+      ATTN_BACKEND: flash-attn
+      SPCONV_ALGO: native
+      MAX_UPLOAD_MB: "10"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  trellis-outputs:
