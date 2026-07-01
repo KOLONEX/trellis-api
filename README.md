@@ -184,9 +184,10 @@ Generated models are written to **`/outputs`** — mount a volume there to keep 
 
 ## 📄 License & credits
 
-Built on [microsoft/TRELLIS](https://github.com/microsoft/TRELLIS); model weights are subject to their
-respective licenses. This wrapper — API, viewer, and Docker packaging — is part of the
-[KOLONEX](https://kolonex.net) toolchain.
+This wrapper — API, viewer, and Docker packaging — is released under the [MIT License](LICENSE) and is
+part of the [KOLONEX](https://kolonex.net) toolchain. It is built on
+[microsoft/TRELLIS](https://github.com/microsoft/TRELLIS); the TRELLIS code and model weights remain
+subject to their own respective licenses.
 
 <div align="center">
 
@@ -333,9 +334,10 @@ pytest
 
 ## 📄 Licencia y créditos
 
-Construido sobre [microsoft/TRELLIS](https://github.com/microsoft/TRELLIS); los pesos del modelo están
-sujetos a sus respectivas licencias. Este wrapper —API, visor y empaquetado Docker— es parte del
-toolchain de [KOLONEX](https://kolonex.net).
+Este wrapper —API, visor y empaquetado Docker— se publica bajo la [Licencia MIT](LICENSE) y es parte del
+toolchain de [KOLONEX](https://kolonex.net). Está construido sobre
+[microsoft/TRELLIS](https://github.com/microsoft/TRELLIS); el código y los pesos de TRELLIS siguen
+sujetos a sus respectivas licencias.
 
 <div align="center">
 
